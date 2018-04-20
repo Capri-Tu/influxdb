@@ -19,9 +19,9 @@ import (
 // goroutine safe while un-exported functions assume the caller will use the
 // appropriate locks.
 type measurement struct {
-	Database  string
-	Name      string `json:"name,omitempty"`
-	NameBytes []byte // cached version as []byte
+	database  string
+	name      string `json:"name,omitempty"`
+	nameBytes []byte // cached version as []byte
 
 	mu         sync.RWMutex
 	fieldNames map[string]struct{}
@@ -41,9 +41,9 @@ type measurement struct {
 // newMeasurement allocates and initializes a new Measurement.
 func newMeasurement(database, name string) *measurement {
 	return &measurement{
-		Database:  database,
-		Name:      name,
-		NameBytes: []byte(name),
+		database:  database,
+		name:      name,
+		nameBytes: []byte(name),
 
 		fieldNames:          make(map[string]struct{}),
 		seriesByID:          make(map[uint64]*series),
@@ -66,7 +66,7 @@ func (m *measurement) Authorized(auth query.Authorizer) bool {
 			continue
 		}
 
-		if query.AuthorizerIsOpen(auth) || auth.AuthorizeSeriesRead(m.Database, m.NameBytes, s.Tags) {
+		if query.AuthorizerIsOpen(auth) || auth.AuthorizeSeriesRead(m.database, m.nameBytes, s.Tags) {
 			return true
 		}
 	}
@@ -299,7 +299,7 @@ func (m *measurement) Rebuild() *measurement {
 	}
 
 	// Create a new measurement from the state of the existing measurement
-	nm := newMeasurement(m.Database, string(m.NameBytes))
+	nm := newMeasurement(m.database, string(m.nameBytes))
 	nm.fieldNames = m.fieldNames
 	m.mu.RUnlock()
 
@@ -404,7 +404,7 @@ func (m *measurement) TagSets(shardSeriesIDs *tsdb.SeriesIDSet, opt query.Iterat
 			continue
 		}
 
-		if opt.Authorizer != nil && !opt.Authorizer.AuthorizeSeriesRead(m.Database, m.NameBytes, s.Tags) {
+		if opt.Authorizer != nil && !opt.Authorizer.AuthorizeSeriesRead(m.database, m.nameBytes, s.Tags) {
 			continue
 		}
 
@@ -657,7 +657,7 @@ func (m *measurement) idsForExpr(n *influxql.BinaryExpr) (seriesIDs, influxql.Ex
 
 		// Special handling for "_name" to match measurement name.
 		if name.Val == "_name" {
-			if (n.Op == influxql.EQ && str.Val == m.Name) || (n.Op == influxql.NEQ && str.Val != m.Name) {
+			if (n.Op == influxql.EQ && str.Val == m.name) || (n.Op == influxql.NEQ && str.Val != m.name) {
 				return m.SeriesIDs(), nil, nil
 			}
 			return nil, nil, nil
@@ -699,7 +699,7 @@ func (m *measurement) idsForExpr(n *influxql.BinaryExpr) (seriesIDs, influxql.Ex
 
 		// Special handling for "_name" to match measurement name.
 		if name.Val == "_name" {
-			match := re.Val.MatchString(m.Name)
+			match := re.Val.MatchString(m.name)
 			if (n.Op == influxql.EQREGEX && match) || (n.Op == influxql.NEQREGEX && !match) {
 				return m.SeriesIDs(), &influxql.BooleanLiteral{Val: true}, nil
 			}
@@ -991,7 +991,7 @@ type measurements []*measurement
 func (a measurements) Len() int { return len(a) }
 
 // Less implements sort.Interface.
-func (a measurements) Less(i, j int) bool { return a[i].Name < a[j].Name }
+func (a measurements) Less(i, j int) bool { return a[i].name < a[j].name }
 
 // Swap implements sort.Interface.
 func (a measurements) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
@@ -1012,11 +1012,11 @@ func (a measurements) Intersect(other measurements) measurements {
 
 	result := make(measurements, 0, len(l))
 	for i < len(l) && j < len(r) {
-		if l[i].Name == r[j].Name {
+		if l[i].name == r[j].name {
 			result = append(result, l[i])
 			i++
 			j++
-		} else if l[i].Name < r[j].Name {
+		} else if l[i].name < r[j].name {
 			i++
 		} else {
 			j++
@@ -1030,11 +1030,11 @@ func (a measurements) Union(other measurements) measurements {
 	result := make(measurements, 0, len(a)+len(other))
 	var i, j int
 	for i < len(a) && j < len(other) {
-		if a[i].Name == other[j].Name {
+		if a[i].name == other[j].name {
 			result = append(result, a[i])
 			i++
 			j++
-		} else if a[i].Name < other[j].Name {
+		} else if a[i].name < other[j].name {
 			result = append(result, a[i])
 			i++
 		} else {
@@ -1476,7 +1476,7 @@ func (m *measurement) TagValues(auth query.Authorizer, key string) []string {
 				if s == nil {
 					continue
 				}
-				if auth.AuthorizeSeriesRead(m.Database, m.NameBytes, s.Tags) {
+				if auth.AuthorizeSeriesRead(m.database, m.nameBytes, s.Tags) {
 					values = append(values, k)
 					return
 				}

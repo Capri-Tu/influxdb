@@ -357,7 +357,7 @@ func (i *Index) TagKeyHasAuthorizedSeries(auth query.Authorizer, name []byte, ke
 				continue
 			}
 
-			if auth.AuthorizeSeriesRead(i.database, mm.NameBytes, s.Tags) {
+			if auth.AuthorizeSeriesRead(i.database, mm.nameBytes, s.Tags) {
 				authorized = true
 				return false
 			}
@@ -420,7 +420,7 @@ func (i *Index) MeasurementTagKeyValuesByExpr(auth query.Authorizer, name []byte
 		if s == nil {
 			continue
 		}
-		if auth != nil && !auth.AuthorizeSeriesRead(i.database, s.Measurement.NameBytes, s.Tags) {
+		if auth != nil && !auth.AuthorizeSeriesRead(i.database, s.Measurement.nameBytes, s.Tags) {
 			continue
 		}
 
@@ -501,7 +501,7 @@ func (i *Index) MeasurementNamesByExpr(auth query.Authorizer, expr influxql.Expr
 		a := make([][]byte, 0, len(i.measurements))
 		for _, m := range i.measurements {
 			if m.Authorized(auth) {
-				a = append(a, m.NameBytes)
+				a = append(a, m.nameBytes)
 			}
 		}
 		bytesutil.Sort(a)
@@ -583,17 +583,17 @@ func (i *Index) measurementNamesByNameFilter(auth query.Authorizer, op influxql.
 		var matched bool
 		switch op {
 		case influxql.EQ:
-			matched = m.Name == val
+			matched = m.name == val
 		case influxql.NEQ:
-			matched = m.Name != val
+			matched = m.name != val
 		case influxql.EQREGEX:
-			matched = regex.MatchString(m.Name)
+			matched = regex.MatchString(m.name)
 		case influxql.NEQREGEX:
-			matched = !regex.MatchString(m.Name)
+			matched = !regex.MatchString(m.name)
 		}
 
 		if matched && m.Authorized(auth) {
-			names = append(names, m.NameBytes)
+			names = append(names, m.nameBytes)
 		}
 	}
 	bytesutil.Sort(names)
@@ -645,7 +645,7 @@ func (i *Index) measurementNamesByTagFilters(auth query.Authorizer, filter *TagF
 					continue
 				}
 
-				if s != nil && auth.AuthorizeSeriesRead(i.database, m.NameBytes, s.Tags) {
+				if s != nil && auth.AuthorizeSeriesRead(i.database, m.nameBytes, s.Tags) {
 					// The Range call can return early as a matching
 					// tag value with an authorized series has been found.
 					authorized = true
@@ -672,7 +672,7 @@ func (i *Index) measurementNamesByTagFilters(auth query.Authorizer, filter *TagF
 		//     False  |       True      |      False
 		//     False  |       False     |      True
 		if tagMatch == (filter.Op == influxql.EQ || filter.Op == influxql.EQREGEX) && authorized {
-			names = append(names, m.NameBytes)
+			names = append(names, m.nameBytes)
 		}
 	}
 
@@ -687,8 +687,8 @@ func (i *Index) MeasurementNamesByRegex(re *regexp.Regexp) ([][]byte, error) {
 
 	var matches [][]byte
 	for _, m := range i.measurements {
-		if re.MatchString(m.Name) {
-			matches = append(matches, m.NameBytes)
+		if re.MatchString(m.name) {
+			matches = append(matches, m.nameBytes)
 		}
 	}
 	return matches, nil
@@ -765,7 +765,7 @@ func (i *Index) DropSeriesGlobal(key []byte, ts int64) error {
 
 	// If the measurement no longer has any series, remove it as well.
 	if !series.Measurement.HasSeries() {
-		i.dropMeasurement(series.Measurement.Name)
+		i.dropMeasurement(series.Measurement.name)
 	}
 
 	return nil
@@ -831,7 +831,7 @@ func (i *Index) ForEachMeasurementName(fn func(name []byte) error) error {
 	i.mu.RUnlock()
 
 	for _, m := range mms {
-		if err := fn(m.NameBytes); err != nil {
+		if err := fn(m.nameBytes); err != nil {
 			return err
 		}
 	}
@@ -1220,7 +1220,7 @@ func (itr *seriesIDIterator) Next() (tsdb.SeriesIDElem, error) {
 		series := itr.keys.buf[itr.keys.i]
 		itr.keys.i++
 
-		if !itr.opt.Authorizer.AuthorizeSeriesRead(itr.database, series.Measurement.NameBytes, series.Tags) {
+		if !itr.opt.Authorizer.AuthorizeSeriesRead(itr.database, series.Measurement.nameBytes, series.Tags) {
 			continue
 		}
 

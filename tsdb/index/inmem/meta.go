@@ -453,7 +453,7 @@ func (m *measurement) TagSets(shardSeriesIDs *tsdb.SeriesIDSet, opt query.Iterat
 }
 
 // intersectSeriesFilters performs an intersection for two sets of ids and filter expressions.
-func intersectSeriesFilters(lids, rids seriesIDs, lfilters, rfilters FilterExprs) (seriesIDs, FilterExprs) {
+func intersectSeriesFilters(lids, rids seriesIDs, lfilters, rfilters filterExprs) (seriesIDs, filterExprs) {
 	// We only want to allocate a slice and map of the smaller size.
 	var ids []uint64
 	if len(lids) > len(rids) {
@@ -462,11 +462,11 @@ func intersectSeriesFilters(lids, rids seriesIDs, lfilters, rfilters FilterExprs
 		ids = make([]uint64, 0, len(lids))
 	}
 
-	var filters FilterExprs
+	var filters filterExprs
 	if len(lfilters) > len(rfilters) {
-		filters = make(FilterExprs, len(rfilters))
+		filters = make(filterExprs, len(rfilters))
 	} else {
-		filters = make(FilterExprs, len(lfilters))
+		filters = make(filterExprs, len(lfilters))
 	}
 
 	// They're in sorted order so advance the counter as needed.
@@ -507,16 +507,16 @@ func intersectSeriesFilters(lids, rids seriesIDs, lfilters, rfilters FilterExprs
 }
 
 // unionSeriesFilters performs a union for two sets of ids and filter expressions.
-func unionSeriesFilters(lids, rids seriesIDs, lfilters, rfilters FilterExprs) (seriesIDs, FilterExprs) {
+func unionSeriesFilters(lids, rids seriesIDs, lfilters, rfilters filterExprs) (seriesIDs, filterExprs) {
 	ids := make([]uint64, 0, len(lids)+len(rids))
 
 	// Setup the filters with the smallest size since we will discard filters
 	// that do not have a match on the other side.
-	var filters FilterExprs
+	var filters filterExprs
 	if len(lfilters) < len(rfilters) {
-		filters = make(FilterExprs, len(lfilters))
+		filters = make(filterExprs, len(lfilters))
 	} else {
-		filters = make(FilterExprs, len(rfilters))
+		filters = make(filterExprs, len(rfilters))
 	}
 
 	for len(lids) > 0 && len(rids) > 0 {
@@ -777,11 +777,11 @@ func (m *measurement) idsForExpr(n *influxql.BinaryExpr) (seriesIDs, influxql.Ex
 	return nil, nil, nil
 }
 
-// FilterExprs represents a map of series IDs to filter expressions.
-type FilterExprs map[uint64]influxql.Expr
+// filterExprs represents a map of series IDs to filter expressions.
+type filterExprs map[uint64]influxql.Expr
 
 // DeleteBoolLiteralTrues deletes all elements whose filter expression is a boolean literal true.
-func (fe FilterExprs) DeleteBoolLiteralTrues() {
+func (fe filterExprs) DeleteBoolLiteralTrues() {
 	for id, expr := range fe {
 		if e, ok := expr.(*influxql.BooleanLiteral); ok && e.Val {
 			delete(fe, id)
@@ -790,7 +790,7 @@ func (fe FilterExprs) DeleteBoolLiteralTrues() {
 }
 
 // Len returns the number of elements.
-func (fe FilterExprs) Len() int {
+func (fe filterExprs) Len() int {
 	if fe == nil {
 		return 0
 	}
@@ -800,7 +800,7 @@ func (fe FilterExprs) Len() int {
 // WalkWhereForSeriesIds recursively walks the WHERE clause and returns an ordered set of series IDs and
 // a map from those series IDs to filter expressions that should be used to limit points returned in
 // the final query result.
-func (m *measurement) WalkWhereForSeriesIds(expr influxql.Expr) (seriesIDs, FilterExprs, error) {
+func (m *measurement) WalkWhereForSeriesIds(expr influxql.Expr) (seriesIDs, filterExprs, error) {
 	switch n := expr.(type) {
 	case *influxql.BinaryExpr:
 		switch n.Op {
@@ -820,9 +820,9 @@ func (m *measurement) WalkWhereForSeriesIds(expr influxql.Expr) (seriesIDs, Filt
 				expr = nil
 			}
 
-			var filters FilterExprs
+			var filters filterExprs
 			if expr != nil {
-				filters = make(FilterExprs, len(ids))
+				filters = make(filterExprs, len(ids))
 				for _, id := range ids {
 					filters[id] = expr
 				}

@@ -175,8 +175,8 @@ func (i *Index) CreateSeriesListIfNotExists(seriesIDSet *tsdb.SeriesIDSet, keys,
 		// This series might need to be added to the local bitset, if the series
 		// was created on another shard.
 		seriesIDSet.Lock()
-		if !seriesIDSet.ContainsNoLock(ss.ID) {
-			seriesIDSet.AddNoLock(ss.ID)
+		if !seriesIDSet.ContainsNoLock(ss.id) {
+			seriesIDSet.AddNoLock(ss.id)
 		}
 		seriesIDSet.Unlock()
 	}
@@ -210,8 +210,8 @@ func (i *Index) CreateSeriesListIfNotExists(seriesIDSet *tsdb.SeriesIDSet, keys,
 		// This series might need to be added to the local bitset, if the series
 		// was created on another shard.
 		seriesIDSet.Lock()
-		if !seriesIDSet.ContainsNoLock(ss.ID) {
-			seriesIDSet.AddNoLock(ss.ID)
+		if !seriesIDSet.ContainsNoLock(ss.id) {
+			seriesIDSet.AddNoLock(ss.id)
 		}
 		seriesIDSet.Unlock()
 	}
@@ -357,7 +357,7 @@ func (i *Index) TagKeyHasAuthorizedSeries(auth query.Authorizer, name []byte, ke
 				continue
 			}
 
-			if auth.AuthorizeSeriesRead(i.database, mm.nameBytes, s.Tags) {
+			if auth.AuthorizeSeriesRead(i.database, mm.nameBytes, s.tags) {
 				authorized = true
 				return false
 			}
@@ -420,13 +420,13 @@ func (i *Index) MeasurementTagKeyValuesByExpr(auth query.Authorizer, name []byte
 		if s == nil {
 			continue
 		}
-		if auth != nil && !auth.AuthorizeSeriesRead(i.database, s.Measurement.nameBytes, s.Tags) {
+		if auth != nil && !auth.AuthorizeSeriesRead(i.database, s.measurement.nameBytes, s.tags) {
 			continue
 		}
 
 		// Iterate the tag keys we're interested in and collect values
 		// from this series, if they exist.
-		for _, t := range s.Tags {
+		for _, t := range s.tags {
 			if idx, ok := keyIdxs[string(t.Key)]; ok {
 				resultSet[idx].add(string(t.Value))
 			} else if string(t.Key) > keys[len(keys)-1] {
@@ -484,7 +484,7 @@ func (i *Index) TagsForSeries(key string) (models.Tags, error) {
 	if ss == nil {
 		return nil, nil
 	}
-	return ss.Tags, nil
+	return ss.tags, nil
 }
 
 // MeasurementNamesByExpr takes an expression containing only tags and returns a
@@ -645,7 +645,7 @@ func (i *Index) measurementNamesByTagFilters(auth query.Authorizer, filter *TagF
 					continue
 				}
 
-				if s != nil && auth.AuthorizeSeriesRead(i.database, m.nameBytes, s.Tags) {
+				if s != nil && auth.AuthorizeSeriesRead(i.database, m.nameBytes, s.tags) {
 					// The Range call can return early as a matching
 					// tag value with an authorized series has been found.
 					authorized = true
@@ -713,8 +713,8 @@ func (i *Index) dropMeasurement(name string) error {
 
 	delete(i.measurements, name)
 	for _, s := range m.SeriesByIDMap() {
-		delete(i.series, s.Key)
-		i.seriesTSSketch.Add([]byte(s.Key))
+		delete(i.series, s.key)
+		i.seriesTSSketch.Add([]byte(s.key))
 	}
 	return nil
 }
@@ -759,13 +759,13 @@ func (i *Index) DropSeriesGlobal(key []byte, ts int64) error {
 	delete(i.series, k)
 
 	// Remove the measurement's reference.
-	series.Measurement.DropSeries(series)
+	series.measurement.DropSeries(series)
 	// Mark the series as deleted.
 	series.Delete()
 
 	// If the measurement no longer has any series, remove it as well.
-	if !series.Measurement.HasSeries() {
-		i.dropMeasurement(series.Measurement.name)
+	if !series.measurement.HasSeries() {
+		i.dropMeasurement(series.measurement.name)
 	}
 
 	return nil
@@ -1032,8 +1032,8 @@ func (i *Index) assignExistingSeries(shardID uint64, seriesIDSet *tsdb.SeriesIDS
 			// Add the existing series to this shard's bitset, since this may
 			// be the first time the series is added to this shard.
 			seriesIDSet.Lock()
-			if !seriesIDSet.ContainsNoLock(ss.ID) {
-				seriesIDSet.AddNoLock(ss.ID)
+			if !seriesIDSet.ContainsNoLock(ss.id) {
+				seriesIDSet.AddNoLock(ss.id)
 			}
 			seriesIDSet.Unlock()
 		}
@@ -1220,11 +1220,11 @@ func (itr *seriesIDIterator) Next() (tsdb.SeriesIDElem, error) {
 		series := itr.keys.buf[itr.keys.i]
 		itr.keys.i++
 
-		if !itr.opt.Authorizer.AuthorizeSeriesRead(itr.database, series.Measurement.nameBytes, series.Tags) {
+		if !itr.opt.Authorizer.AuthorizeSeriesRead(itr.database, series.measurement.nameBytes, series.tags) {
 			continue
 		}
 
-		return tsdb.SeriesIDElem{SeriesID: series.ID}, nil
+		return tsdb.SeriesIDElem{SeriesID: series.id}, nil
 	}
 }
 
@@ -1252,7 +1252,7 @@ func (itr *seriesIDIterator) nextKeys() error {
 
 		// Sort series by key
 		sort.Slice(itr.keys.buf, func(i, j int) bool {
-			return itr.keys.buf[i].Key < itr.keys.buf[j].Key
+			return itr.keys.buf[i].key < itr.keys.buf[j].key
 		})
 
 		return nil

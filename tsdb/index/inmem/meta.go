@@ -66,7 +66,7 @@ func (m *measurement) Authorized(auth query.Authorizer) bool {
 			continue
 		}
 
-		if query.AuthorizerIsOpen(auth) || auth.AuthorizeSeriesRead(m.database, m.nameBytes, s.Tags) {
+		if query.AuthorizerIsOpen(auth) || auth.AuthorizeSeriesRead(m.database, m.nameBytes, s.tags) {
 			return true
 		}
 	}
@@ -111,7 +111,7 @@ func (m *measurement) AppendSeriesKeysByID(dst []string, ids []uint64) []string 
 	defer m.mu.RUnlock()
 	for _, id := range ids {
 		if s := m.seriesByID[id]; s != nil && !s.Deleted() {
-			dst = append(dst, s.Key)
+			dst = append(dst, s.key)
 		}
 	}
 	return dst
@@ -127,7 +127,7 @@ func (m *measurement) SeriesKeysByID(ids seriesIDs) [][]byte {
 		if s == nil || s.Deleted() {
 			continue
 		}
-		keys = append(keys, []byte(s.Key))
+		keys = append(keys, []byte(s.key))
 	}
 
 	if !bytesutil.IsSorted(keys) {
@@ -146,7 +146,7 @@ func (m *measurement) SeriesKeys() [][]byte {
 		if s.Deleted() {
 			continue
 		}
-		keys = append(keys, []byte(s.Key))
+		keys = append(keys, []byte(s.key))
 	}
 
 	if !bytesutil.IsSorted(keys) {
@@ -238,7 +238,7 @@ func (m *measurement) AddSeries(s *series) bool {
 	}
 
 	m.mu.RLock()
-	if m.seriesByID[s.ID] != nil {
+	if m.seriesByID[s.id] != nil {
 		m.mu.RUnlock()
 		return false
 	}
@@ -247,24 +247,24 @@ func (m *measurement) AddSeries(s *series) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.seriesByID[s.ID] != nil {
+	if m.seriesByID[s.id] != nil {
 		return false
 	}
 
-	m.seriesByID[s.ID] = s
+	m.seriesByID[s.id] = s
 
-	if len(m.seriesByID) == 1 || (len(m.sortedSeriesIDs) == len(m.seriesByID)-1 && s.ID > m.sortedSeriesIDs[len(m.sortedSeriesIDs)-1]) {
-		m.sortedSeriesIDs = append(m.sortedSeriesIDs, s.ID)
+	if len(m.seriesByID) == 1 || (len(m.sortedSeriesIDs) == len(m.seriesByID)-1 && s.id > m.sortedSeriesIDs[len(m.sortedSeriesIDs)-1]) {
+		m.sortedSeriesIDs = append(m.sortedSeriesIDs, s.id)
 	}
 
 	// add this series id to the tag index on the measurement
-	for _, t := range s.Tags {
+	for _, t := range s.tags {
 		valueMap := m.seriesByTagKeyValue[string(t.Key)]
 		if valueMap == nil {
 			valueMap = newTagKeyValue()
 			m.seriesByTagKeyValue[string(t.Key)] = valueMap
 		}
-		valueMap.InsertSeriesIDByte(t.Value, s.ID)
+		valueMap.InsertSeriesIDByte(t.Value, s.id)
 	}
 
 	return true
@@ -272,7 +272,7 @@ func (m *measurement) AddSeries(s *series) bool {
 
 // DropSeries removes a series from the measurement's index.
 func (m *measurement) DropSeries(series *series) {
-	seriesID := series.ID
+	seriesID := series.id
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -322,7 +322,7 @@ func (m *measurement) Rebuild() *measurement {
 	for _, id := range m.sortedSeriesIDs {
 		if s := m.seriesByID[id]; s != nil {
 			// Explicitly set the new measurement on the series.
-			s.Measurement = nm
+			s.measurement = nm
 			nm.AddSeries(s)
 		}
 	}
@@ -349,7 +349,7 @@ func (m *measurement) ForEachSeriesByExpr(condition influxql.Expr, fn func(tags 
 	// Iterate over each series.
 	for _, id := range ids {
 		s := m.SeriesByID(id)
-		if err := fn(s.Tags); err != nil {
+		if err := fn(s.tags); err != nil {
 			return err
 		}
 	}
@@ -404,13 +404,13 @@ func (m *measurement) TagSets(shardSeriesIDs *tsdb.SeriesIDSet, opt query.Iterat
 			continue
 		}
 
-		if opt.Authorizer != nil && !opt.Authorizer.AuthorizeSeriesRead(m.database, m.nameBytes, s.Tags) {
+		if opt.Authorizer != nil && !opt.Authorizer.AuthorizeSeriesRead(m.database, m.nameBytes, s.tags) {
 			continue
 		}
 
 		var tagsAsKey []byte
 		if len(dims) > 0 {
-			tagsAsKey = tsdb.MakeTagsKey(dims, s.Tags)
+			tagsAsKey = tsdb.MakeTagsKey(dims, s.tags)
 		}
 
 		tagSet := tagSets[string(tagsAsKey)]
@@ -423,7 +423,7 @@ func (m *measurement) TagSets(shardSeriesIDs *tsdb.SeriesIDSet, opt query.Iterat
 			tagSets[string(tagsAsKey)] = tagSet
 		}
 		// Associate the series and filter with the Tagset.
-		tagSet.AddFilter(s.Key, filters[id])
+		tagSet.AddFilter(s.key, filters[id])
 		seriesN++
 	}
 	// Release the lock while we sort all the tags
@@ -1059,19 +1059,19 @@ type series struct {
 	deleted bool
 
 	// immutable
-	ID          uint64
-	Measurement *measurement
-	Key         string
-	Tags        models.Tags
+	id          uint64
+	measurement *measurement
+	key         string
+	tags        models.Tags
 }
 
 // newSeries returns an initialized series struct
 func newSeries(id uint64, m *measurement, key string, tags models.Tags) *series {
 	return &series{
-		ID:          id,
-		Measurement: m,
-		Key:         key,
-		Tags:        tags,
+		id:          id,
+		measurement: m,
+		key:         key,
+		tags:        tags,
 	}
 }
 
@@ -1476,7 +1476,7 @@ func (m *measurement) TagValues(auth query.Authorizer, key string) []string {
 				if s == nil {
 					continue
 				}
-				if auth.AuthorizeSeriesRead(m.database, m.nameBytes, s.Tags) {
+				if auth.AuthorizeSeriesRead(m.database, m.nameBytes, s.tags) {
 					values = append(values, k)
 					return
 				}

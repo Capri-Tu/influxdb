@@ -1430,12 +1430,12 @@ func (a *evictSeriesIDs) evict() (ids seriesIDs) {
 	return ids
 }
 
-// TagFilter represents a tag filter when looking up other tags or measurements.
-type TagFilter struct {
-	Op    influxql.Token
-	Key   string
-	Value string
-	Regex *regexp.Regexp
+// tagFilter represents a tag filter when looking up other tags or measurements.
+type tagFilter struct {
+	op    influxql.Token
+	key   string
+	value string
+	regex *regexp.Regexp
 }
 
 // WalkTagKeys calls fn for each tag key associated with m.  The order of the

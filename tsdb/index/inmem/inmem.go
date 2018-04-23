@@ -525,9 +525,9 @@ func (i *Index) measurementNamesByExpr(auth query.Authorizer, expr influxql.Expr
 				return nil, fmt.Errorf("left side of '%s' must be a tag key", e.Op.String())
 			}
 
-			tf := &TagFilter{
-				Op:  e.Op,
-				Key: tag.Val,
+			tf := &tagFilter{
+				op:  e.Op,
+				key: tag.Val,
 			}
 
 			if influxql.IsRegexOp(e.Op) {
@@ -535,18 +535,18 @@ func (i *Index) measurementNamesByExpr(auth query.Authorizer, expr influxql.Expr
 				if !ok {
 					return nil, fmt.Errorf("right side of '%s' must be a regular expression", e.Op.String())
 				}
-				tf.Regex = re.Val
+				tf.regex = re.Val
 			} else {
 				s, ok := e.RHS.(*influxql.StringLiteral)
 				if !ok {
 					return nil, fmt.Errorf("right side of '%s' must be a tag value string", e.Op.String())
 				}
-				tf.Value = s.Val
+				tf.value = s.Val
 			}
 
 			// Match on name, if specified.
 			if tag.Val == "_name" {
-				return i.measurementNamesByNameFilter(auth, tf.Op, tf.Value, tf.Regex), nil
+				return i.measurementNamesByNameFilter(auth, tf.op, tf.value, tf.regex), nil
 			} else if influxql.IsSystemName(tag.Val) {
 				return nil, nil
 			}
@@ -601,20 +601,20 @@ func (i *Index) measurementNamesByNameFilter(auth query.Authorizer, op influxql.
 }
 
 // measurementNamesByTagFilters returns the sorted measurements matching the filters on tag values.
-func (i *Index) measurementNamesByTagFilters(auth query.Authorizer, filter *TagFilter) [][]byte {
+func (i *Index) measurementNamesByTagFilters(auth query.Authorizer, filter *tagFilter) [][]byte {
 	// Build a list of measurements matching the filters.
 	var names [][]byte
 	var tagMatch bool
 	var authorized bool
 
-	valEqual := filter.Regex.MatchString
-	if filter.Op == influxql.EQ || filter.Op == influxql.NEQ {
-		valEqual = func(s string) bool { return filter.Value == s }
+	valEqual := filter.regex.MatchString
+	if filter.op == influxql.EQ || filter.op == influxql.NEQ {
+		valEqual = func(s string) bool { return filter.value == s }
 	}
 
 	// Iterate through all measurements in the database.
 	for _, m := range i.measurements {
-		tagVals := m.SeriesByTagKeyValue(filter.Key)
+		tagVals := m.SeriesByTagKeyValue(filter.key)
 		if tagVals == nil {
 			continue
 		}
@@ -655,13 +655,13 @@ func (i *Index) measurementNamesByTagFilters(auth query.Authorizer, filter *TagF
 
 			// The matching tag value doesn't have any authorized series.
 			// Check for other matching tag values if this is a regex check.
-			return filter.Op == influxql.EQREGEX
+			return filter.op == influxql.EQREGEX
 		})
 
 		// For negation operators, to determine if the measurement is authorized,
 		// an authorized series belonging to the measurement must be located.
 		// Then, the measurement can be added iff !tagMatch && authorized.
-		if auth != nil && !tagMatch && (filter.Op == influxql.NEQREGEX || filter.Op == influxql.NEQ) {
+		if auth != nil && !tagMatch && (filter.op == influxql.NEQREGEX || filter.op == influxql.NEQ) {
 			authorized = m.Authorized(auth)
 		}
 
@@ -671,7 +671,7 @@ func (i *Index) measurementNamesByTagFilters(auth query.Authorizer, filter *TagF
 		//     True   |       False     |      False
 		//     False  |       True      |      False
 		//     False  |       False     |      True
-		if tagMatch == (filter.Op == influxql.EQ || filter.Op == influxql.EQREGEX) && authorized {
+		if tagMatch == (filter.op == influxql.EQ || filter.op == influxql.EQREGEX) && authorized {
 			names = append(names, m.nameBytes)
 		}
 	}

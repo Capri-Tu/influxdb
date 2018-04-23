@@ -1,6 +1,10 @@
 v1.6.0 [unreleased]
 -------------------
 
+### MyChangeLog
+
+-   修改HTTP请求日志记录格式（services/httpd/response_logger.go）
+
 ### Breaking changes
 
 -	If math is used with the same selector multiple times, it will now act as a selector rather than an aggregate. See [#9563](https://github.com/influxdata/influxdb/pull/9563) for details.

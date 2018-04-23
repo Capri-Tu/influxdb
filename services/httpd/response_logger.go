@@ -101,13 +101,16 @@ func buildLogLine(l *responseLogger, r *http.Request, start time.Time) string {
 
 	userAgent := r.UserAgent()
 
-	return fmt.Sprintf(`%s - %s [%s] "%s %s %s" %s %s "%s" "%s" %s %d`,
+	params := r.Form
+
+	return fmt.Sprintf(`%s %s time_str[%s] method[%s] params[%s] status[%s] %s %s %s %s %s %s time_int64[%d]`,
 		host,
 		detect(username, "-"),
 		start.Format("02/Jan/2006:15:04:05 -0700"),
 		r.Method,
 		uri,
 		r.Proto,
+		params,
 		detect(strconv.Itoa(l.Status()), "-"),
 		strconv.Itoa(l.Size()),
 		detect(referer, "-"),

@@ -115,6 +115,8 @@ type Handler struct {
 	stats     *Statistics
 
 	requestTracker *RequestTracker
+
+	body string
 }
 
 // NewHandler returns a new instance of handler with routes.
@@ -716,6 +718,9 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.U
 	if h.Config.WriteTracing {
 		h.Logger.Info("Write body received by handler", zap.ByteString("body", buf.Bytes()))
 	}
+
+	// 因为从Request里面取不到Body中的数据，所以在这里保存之后传给logger
+	h.body = string(buf.Bytes())
 
 	points, parseError := models.ParsePointsWithPrecision(buf.Bytes(), time.Now().UTC(), r.URL.Query().Get("precision"))
 	// Not points parsed correctly so return the error now
@@ -1531,7 +1536,7 @@ func (h *Handler) logging(inner http.Handler, name string) http.Handler {
 		start := time.Now()
 		l := &responseLogger{w: w}
 		inner.ServeHTTP(l, r)
-		h.CLFLogger.Println(buildLogLine(l, r, start))
+		h.CLFLogger.Println(buildLogLine(l, r, start, h.body))
 
 		// Log server errors.
 		if l.Status()/100 == 5 {
@@ -1568,7 +1573,7 @@ func (h *Handler) recovery(inner http.Handler, name string) http.Handler {
 
 		defer func() {
 			if err := recover(); err != nil {
-				logLine := buildLogLine(l, r, start)
+				logLine := buildLogLine(l, r, start, h.body)
 				logLine = fmt.Sprintf("%s [panic:%s] %s", logLine, err, debug.Stack())
 				h.CLFLogger.Println(logLine)
 				http.Error(w, http.StatusText(http.StatusInternalServerError), 500)

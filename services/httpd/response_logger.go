@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -79,7 +80,7 @@ func redactPassword(r *http.Request) {
 // request ID and response time (microseconds)
 // ie, in apache mod_log_config terms:
 //     %h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"" %L %D
-func buildLogLine(l *responseLogger, r *http.Request, start time.Time) string {
+func buildLogLine(l *responseLogger, r *http.Request, start time.Time, body string) string {
 
 	redactPassword(r)
 
@@ -101,24 +102,20 @@ func buildLogLine(l *responseLogger, r *http.Request, start time.Time) string {
 
 	userAgent := r.UserAgent()
 
-	params := r.Form
-
-	return fmt.Sprintf(`%s %s time_str[%s] method[%s] params[%s] status[%s] %s %s %s %s %s %s time_int64[%d]`,
+	//return fmt.Sprintf(`host[%s] username[%s] start[%s] Method[%s] uri[%s] body[%s] Proto[%s] Status[%s] Size[%s] referer[%s] userAgent[%s] Request-Id[%s] time[%d]`,
+	return fmt.Sprintf(`{timeindex:%d,"host":"%s",username:"%s",method:"%s",uri:"%s",body:"%s",proto:"%s",status:"%s",size:"%s",referer:"%s",agent:"%s",reqId:"%s"}`,
+		int64(time.Since(start)/time.Microsecond),
 		host,
 		detect(username, "-"),
-		start.Format("02/Jan/2006:15:04:05 -0700"),
 		r.Method,
 		uri,
+		body,
 		r.Proto,
-		params,
 		detect(strconv.Itoa(l.Status()), "-"),
 		strconv.Itoa(l.Size()),
 		detect(referer, "-"),
 		detect(userAgent, "-"),
-		r.Header.Get("Request-Id"),
-		// response time, report in microseconds because this is consistent
-		// with apache's %D parameter in mod_log_config
-		int64(time.Since(start)/time.Microsecond))
+		r.Header.Get("Request-Id"))
 }
 
 // detect detects the first presence of a non blank string and returns it

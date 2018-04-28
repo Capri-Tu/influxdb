@@ -1,7 +1,6 @@
 package httpd
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -102,13 +101,19 @@ func buildLogLine(l *responseLogger, r *http.Request, start time.Time, body stri
 
 	userAgent := r.UserAgent()
 
-	//return fmt.Sprintf(`host[%s] username[%s] start[%s] Method[%s] uri[%s] body[%s] Proto[%s] Status[%s] Size[%s] referer[%s] userAgent[%s] Request-Id[%s] time[%d]`,
-	return fmt.Sprintf(`{timeindex:%d,"host":"%s",username:"%s",method:"%s",uri:"%s",body:"%s",proto:"%s",status:"%s",size:"%s",referer:"%s",agent:"%s",reqId:"%s"}`,
-		int64(time.Since(start)/time.Microsecond),
+	path := r.URL.Path
+
+	r.ParseForm()
+	form := r.Form
+
+	return fmt.Sprintf(`{"timeindex":%d,"host":"%s","username":"%s","method":"%s","path":"%s","uri":"%s","form":"%s","body":"%s","proto":"%s","status":"%s","size":"%s","referer":"%s","agent":"%s","reqId":"%s"}`,
+		start.Nanosecond(),
 		host,
 		detect(username, "-"),
 		r.Method,
+		path,
 		uri,
+		form,
 		body,
 		r.Proto,
 		detect(strconv.Itoa(l.Status()), "-"),

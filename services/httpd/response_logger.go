@@ -106,6 +106,8 @@ func buildLogLine(l *responseLogger, r *http.Request, start time.Time, body stri
 	r.ParseForm()
 	form := r.Form
 
+	newbody := strings.Replace(body, "\n", ";", -1)
+
 	return fmt.Sprintf(`{"timeindex":%d,"host":"%s","username":"%s","method":"%s","path":"%s","uri":"%s","form":"%s","body":"%s","proto":"%s","status":"%s","size":"%s","referer":"%s","agent":"%s","reqId":"%s"}`,
 		start.Nanosecond(),
 		host,
@@ -114,7 +116,7 @@ func buildLogLine(l *responseLogger, r *http.Request, start time.Time, body stri
 		path,
 		uri,
 		form,
-		body,
+		newbody,
 		r.Proto,
 		detect(strconv.Itoa(l.Status()), "-"),
 		strconv.Itoa(l.Size()),

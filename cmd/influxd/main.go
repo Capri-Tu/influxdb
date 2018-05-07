@@ -28,7 +28,7 @@ var (
 func init() {
 	// If commit, branch, or build time are not set, make that clear.
 	if version == "" {
-		version = "unknown"
+		version = "github.com/callELPSYCONGROO/influxdb"
 	}
 	if commit == "" {
 		commit = "unknown"

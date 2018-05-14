@@ -3,7 +3,7 @@ v1.6.0 [unreleased]
 
 ### MyChangeLog
 
--   修改HTTP请求日志记录格式（services/httpd/response_logger.go）
+-   修改HTTP请求日志记录格式（services/httpd/response_logger.go、services/httpd/handler.go）
 
 ### Breaking changes
 

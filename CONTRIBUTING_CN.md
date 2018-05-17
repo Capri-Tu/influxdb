@@ -46,9 +46,9 @@ export GOPATH=$YOUR_PATH/
 cd $YOUR_PATH/src/influxdb
 ```
 
-安装依赖：
+如果正确安装了dep，这使用这个命令安装依赖：
 ```
-dep sure
+dep ensure
 ```
 
 > 安装依赖时，如果遇到无法连接到依赖所需的服务器，需要查看所缺依赖，手动将这些依赖源码下载到`$YOUR_PATH/src/`对应路径下。所需依赖在Github上均有源码可以下载。

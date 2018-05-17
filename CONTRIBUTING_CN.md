@@ -33,7 +33,7 @@ mkdir -p $YOUR_PATH/src/influxdb
 将源码下载解压到目录`$YOUR_PATH/src/influxdb`中：
 ```
 cd $YOUR_PATH/src/
-git clone $THIS_PATH
+git clone https://github.com/callELPSYCONGROO/influxdb.git
 ```
 
 将目录`$YOUR_PATH/`设置为`GOPATH`：

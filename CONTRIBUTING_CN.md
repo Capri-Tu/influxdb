@@ -25,14 +25,15 @@ InfluxDB使用Dep管理依赖包，需要安装[dep](https://github.com/golang/d
 安装InfluxDB
 ------------
 
-新建目录`$YOUR_PATH/src/influxdb`，`$YOUR_PATH`为自定义目录：
+新建目录`$YOUR_PATH/gocodez/src`、`$YOUR_PATH/gocodez/src`，`$YOUR_PATH`为自定义目录：
 ```
-mkdir -p $YOUR_PATH/src/influxdb
+mkdir -p $YOUR_PATH/gocodez/src
+mkdir -p $YOUR_PATH/gocodez/bin
 ```
 
-将源码下载解压到目录`$YOUR_PATH/src/influxdb`中：
+将源码下载解压到目录`$YOUR_PATH/gocodez/src`中：
 ```
-cd $YOUR_PATH/src/
+cd $YOUR_PATH/gocodez/src/
 git clone https://github.com/callELPSYCONGROO/influxdb.git
 ```
 
@@ -43,7 +44,7 @@ export GOPATH=$YOUR_PATH/
 
 进入目录中：
 ```
-cd $YOUR_PATH/src/influxdb
+cd $YOUR_PATH/gocodez/src/influxdb
 ```
 
 如果正确安装了dep，这使用这个命令安装依赖：
@@ -55,21 +56,23 @@ dep ensure
 
 > 如果安装或使用dep不成功，可以跳过此步，在下一步时根据错误提示，手动安装所需依赖。
 
+> 安装依赖可以使用[依赖包](https://pan.baidu.com/s/1SAt_Iwdke7ggEHCHMTpljg)，将依赖包的/src解压到$YOUR_PATH/gocodez目录下即可。
+
 构建安装二进制执行码：
 ```
 go clean ./...
 go install ./...
 ```
 
-安装完成后，二进制执行码放在`$YOUR_PATH/bin/`中，启动时序数据库：
+安装完成后，二进制执行码放在`$YOUR_PATH/gocodez/bin/`中，启动时序数据库：
 ```
-$YOUR_PATH/bin/influxd
+$YOUR_PATH/gocodez/bin/influxd
 ```
 
 安装主从同步脚本
 ----------------
 
-新建目录`$YOUR_SCRIPT`:
+新建目录`$YOUR_SCRIPT`，`$YOUR_SCRIPT`为自定义脚本目录:
 ```
 mkdir $YOUR_SCRIPT
 ```

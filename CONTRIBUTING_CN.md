@@ -83,4 +83,4 @@ cd $YOUR_SCRIPT
 git clone https://github.com/callELPSYCONGROO/master_slave
 ```
 
-参考其中的[README.md](https://github.com/callELPSYCONGROO/master_slave/blob/master/README.md)完成脚本配置和运行。
+参考其中的[README.md](https://github.com/callELPSYCONGROO/influxdb_sync/blob/master/README.md)完成脚本配置和运行。

@@ -3,7 +3,9 @@ v1.6.0 [unreleased]
 
 ### MyChangeLog
 
--   修改HTTP请求日志记录格式（services/httpd/response_logger.go、services/httpd/handler.go）
+-   [Go版主从同步](https://github.com/callELPSYCONGROO/influxdb/tree/influxdb_sync)：将主从同步方法写入源码中，在插入时同步。同步异常的记录存入日志中，再定时同步并清理日志记录。
+
+-   [Python版主从同步](https://github.com/callELPSYCONGROO/influxdb/tree/python_sync)：使用[Python脚本](https://github.com/callELPSYCONGROO/influxdb_sync)同步增删改操作，修改HTTP请求日志记录格式（services/httpd/response_logger.go、services/httpd/handler.go）。这个版本存在问题：增删改数据量过大以后，日志文件变得很大。没有解决日志文件切割或者更新问题。
 
 ### Breaking changes
 

@@ -79,7 +79,7 @@ func redactPassword(r *http.Request) {
 // request ID and response time (microseconds)
 // ie, in apache mod_log_config terms:
 //     %h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"" %L %D
-func buildLogLine(l *responseLogger, r *http.Request, start time.Time, body string) string {
+func buildLogLine(l *responseLogger, r *http.Request, start time.Time) string {
 
 	redactPassword(r)
 
@@ -101,28 +101,21 @@ func buildLogLine(l *responseLogger, r *http.Request, start time.Time, body stri
 
 	userAgent := r.UserAgent()
 
-	path := r.URL.Path
-
-	r.ParseForm()
-	form := r.Form
-
-	newbody := strings.Replace(body, "\n", ";", -1)
-
-	return fmt.Sprintf(`{"timeindex":%d,"host":"%s","username":"%s","method":"%s","path":"%s","uri":"%s","form":"%s","body":"%s","proto":"%s","status":"%s","size":"%s","referer":"%s","agent":"%s","reqId":"%s"}`,
-		start.Nanosecond(),
+	return fmt.Sprintf(`%s - %s [%s] "%s %s %s" %s %s "%s" "%s" %s %d`,
 		host,
 		detect(username, "-"),
+		start.Format("02/Jan/2006:15:04:05 -0700"),
 		r.Method,
-		path,
 		uri,
-		form,
-		newbody,
 		r.Proto,
 		detect(strconv.Itoa(l.Status()), "-"),
 		strconv.Itoa(l.Size()),
 		detect(referer, "-"),
 		detect(userAgent, "-"),
-		r.Header.Get("Request-Id"))
+		r.Header.Get("Request-Id"),
+		// response time, report in microseconds because this is consistent
+		// with apache's %D parameter in mod_log_config
+		int64(time.Since(start)/time.Microsecond))
 }
 
 // detect detects the first presence of a non blank string and returns it

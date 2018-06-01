@@ -503,3 +503,22 @@
 
   # interval for how often continuous queries will be checked if they need to run
   # run-interval = "1s"
+
+###
+### [slave_sync]
+###
+### 主从同步，从机配置，默认关闭
+###
+
+[slave_sync]
+  # 从机URL，默认关闭
+  # enabled = false
+
+  # 从机URL
+  # slave-url = "0.0.0.0:8086"
+
+  # 从机写入操作账号
+  # slave-username = "username"
+
+  # 从机写入账号的密码
+  # slave-password = "p.a.s.s.w.o.r.d"

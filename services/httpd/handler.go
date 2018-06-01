@@ -1536,7 +1536,7 @@ func (h *Handler) logging(inner http.Handler, name string) http.Handler {
 		start := time.Now()
 		l := &responseLogger{w: w}
 		inner.ServeHTTP(l, r)
-		h.CLFLogger.Println(buildLogLine(l, r, start, h.body))
+		h.CLFLogger.Println(buildLogLine(l, r, start))
 
 		// Log server errors.
 		if l.Status()/100 == 5 {
@@ -1573,7 +1573,7 @@ func (h *Handler) recovery(inner http.Handler, name string) http.Handler {
 
 		defer func() {
 			if err := recover(); err != nil {
-				logLine := buildLogLine(l, r, start, h.body)
+				logLine := buildLogLine(l, r, start)
 				logLine = fmt.Sprintf("%s [panic:%s] %s", logLine, err, debug.Stack())
 				h.CLFLogger.Println(logLine)
 				http.Error(w, http.StatusText(http.StatusInternalServerError), 500)
@@ -1590,6 +1590,29 @@ func (h *Handler) recovery(inner http.Handler, name string) http.Handler {
 
 		inner.ServeHTTP(l, r)
 	})
+}
+
+// 向主库中写入，调用原生h.serveWrite方法
+// 再向从库中写入
+func (h *Handler) writeAndLog(w http.ResponseWriter, r *http.Request, user meta.User) {
+	// 向主库写入
+	h.serveWrite(w, r, user)
+	// 向从库写入
+	client.NewHTTPClient(client.HTTPConfig{
+		Addr:     nil,
+		Username: nil,
+		Password: nil,
+	})
+	// 从库写入发生异常，向日志中写入
+}
+
+// 增删操作向从库写入，查询只在主库执行
+func (h *Handler) queryAndLog(w http.ResponseWriter, r *http.Request, user meta.User) {
+	// 主库执行方法
+	h.serveQuery(w, r, user)
+	// 增删操作向从库写入
+
+	// 从库写入发生异常，向日志中写入
 }
 
 // Response represents a list of statement results.

@@ -30,6 +30,7 @@ import (
 	"github.com/influxdata/influxdb/tsdb"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
+	"github.com/influxdata/influxdb/slave_sync"
 )
 
 const (
@@ -62,6 +63,9 @@ type Config struct {
 
 	// BindAddress is the address that all TCP services use (Raft, Snapshot, Cluster, etc.)
 	BindAddress string `toml:"bind-address"`
+
+	// 主从同步配置
+	SlaveSync slave_sync.Config `toml:"slave_sync"`
 }
 
 // NewConfig returns an instance of Config with reasonable defaults.
@@ -86,6 +90,8 @@ func NewConfig() *Config {
 	c.ContinuousQuery = continuous_querier.NewConfig()
 	c.Retention = retention.NewConfig()
 	c.BindAddress = DefaultBindAddress
+
+	c.SlaveSync = slave_sync.NewConfig()
 
 	return c
 }
@@ -188,6 +194,10 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if err := c.SlaveSync.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -220,6 +230,8 @@ func (c *Config) diagnosticsClients() map[string]diagnostics.Client {
 		"config-httpd":      c.HTTPD,
 
 		"config-cqs": c.ContinuousQuery,
+
+		"slave_sync": c.SlaveSync,
 	}
 
 	// Config settings that can be repeated and can be disabled.

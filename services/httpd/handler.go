@@ -37,6 +37,8 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
+	"github.com/influxdata/influxdb/slave_sync"
+	"github.com/influxdata/influxdb/client/v2"
 )
 
 const (
@@ -115,8 +117,6 @@ type Handler struct {
 	stats     *Statistics
 
 	requestTracker *RequestTracker
-
-	body string
 }
 
 // NewHandler returns a new instance of handler with routes.
@@ -137,11 +137,11 @@ func NewHandler(c Config) *Handler {
 		},
 		Route{
 			"query", // Query serving route.
-			"GET", "/query", true, true, h.serveQuery,
+			"GET", "/query", true, true, h.queryAndLog,
 		},
 		Route{
 			"query", // Query serving route.
-			"POST", "/query", true, true, h.serveQuery,
+			"POST", "/query", true, true, h.queryAndLog,
 		},
 		Route{
 			"write-options", // Satisfy CORS checks.
@@ -149,7 +149,7 @@ func NewHandler(c Config) *Handler {
 		},
 		Route{
 			"write", // Data-ingest route.
-			"POST", "/write", true, true, h.serveWrite,
+			"POST", "/write", true, true, h.writeAndLog,
 		},
 		Route{
 			"prometheus-write", // Prometheus remote write
@@ -639,7 +639,7 @@ func (h *Handler) async(q *influxql.Query, results <-chan *query.Result) {
 }
 
 // serveWrite receives incoming series data in line protocol format and writes it to the database.
-func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.User) {
+func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.User) client.BatchPoints {
 	atomic.AddInt64(&h.stats.WriteRequests, 1)
 	atomic.AddInt64(&h.stats.ActiveWriteRequests, 1)
 	defer func(start time.Time) {
@@ -651,23 +651,23 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.U
 	database := r.URL.Query().Get("db")
 	if database == "" {
 		h.httpError(w, "database is required", http.StatusBadRequest)
-		return
+		return nil
 	}
 
 	if di := h.MetaClient.Database(database); di == nil {
 		h.httpError(w, fmt.Sprintf("database not found: %q", database), http.StatusNotFound)
-		return
+		return nil
 	}
 
 	if h.Config.AuthEnabled {
 		if user == nil {
 			h.httpError(w, fmt.Sprintf("user is required to write to database %q", database), http.StatusForbidden)
-			return
+			return nil
 		}
 
 		if err := h.WriteAuthorizer.AuthorizeWrite(user.ID(), database); err != nil {
 			h.httpError(w, fmt.Sprintf("%q user is not authorized to write to database %q", user.ID(), database), http.StatusForbidden)
-			return
+			return nil
 		}
 	}
 
@@ -681,7 +681,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.U
 		b, err := gzip.NewReader(r.Body)
 		if err != nil {
 			h.httpError(w, err.Error(), http.StatusBadRequest)
-			return
+			return nil
 		}
 		defer b.Close()
 		body = b
@@ -691,7 +691,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.U
 	if r.ContentLength > 0 {
 		if h.Config.MaxBodySize > 0 && r.ContentLength > int64(h.Config.MaxBodySize) {
 			h.httpError(w, http.StatusText(http.StatusRequestEntityTooLarge), http.StatusRequestEntityTooLarge)
-			return
+			return nil
 		}
 
 		// This will just be an initial hint for the gzip reader, as the
@@ -704,14 +704,14 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.U
 	if err != nil {
 		if err == errTruncated {
 			h.httpError(w, http.StatusText(http.StatusRequestEntityTooLarge), http.StatusRequestEntityTooLarge)
-			return
+			return nil
 		}
 
 		if h.Config.WriteTracing {
 			h.Logger.Info("Write handler unable to read bytes from request body")
 		}
 		h.httpError(w, err.Error(), http.StatusBadRequest)
-		return
+		return nil
 	}
 	atomic.AddInt64(&h.stats.WriteRequestBytesReceived, int64(buf.Len()))
 
@@ -719,18 +719,15 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.U
 		h.Logger.Info("Write body received by handler", zap.ByteString("body", buf.Bytes()))
 	}
 
-	// 因为从Request里面取不到Body中的数据，所以在这里保存之后传给logger
-	h.body = string(buf.Bytes())
-
 	points, parseError := models.ParsePointsWithPrecision(buf.Bytes(), time.Now().UTC(), r.URL.Query().Get("precision"))
 	// Not points parsed correctly so return the error now
 	if parseError != nil && len(points) == 0 {
 		if parseError.Error() == "EOF" {
 			h.writeHeader(w, http.StatusOK)
-			return
+			return nil
 		}
 		h.httpError(w, parseError.Error(), http.StatusBadRequest)
-		return
+		return nil
 	}
 
 	// Determine required consistency level.
@@ -741,7 +738,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.U
 		consistency, err = models.ParseConsistencyLevel(level)
 		if err != nil {
 			h.httpError(w, err.Error(), http.StatusBadRequest)
-			return
+			return nil
 		}
 	}
 
@@ -749,31 +746,33 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.U
 	if err := h.PointsWriter.WritePoints(database, r.URL.Query().Get("rp"), consistency, user, points); influxdb.IsClientError(err) {
 		atomic.AddInt64(&h.stats.PointsWrittenFail, int64(len(points)))
 		h.httpError(w, err.Error(), http.StatusBadRequest)
-		return
+		// 获取值
+		return slave_sync.ToBatchPoints(database, r.URL.Query().Get("rp"), string(consistency), r.URL.Query().Get("precision"), points)
 	} else if influxdb.IsAuthorizationError(err) {
 		atomic.AddInt64(&h.stats.PointsWrittenFail, int64(len(points)))
 		h.httpError(w, err.Error(), http.StatusForbidden)
-		return
+		return nil
 	} else if werr, ok := err.(tsdb.PartialWriteError); ok {
 		atomic.AddInt64(&h.stats.PointsWrittenOK, int64(len(points)-werr.Dropped))
 		atomic.AddInt64(&h.stats.PointsWrittenDropped, int64(werr.Dropped))
 		h.httpError(w, werr.Error(), http.StatusBadRequest)
-		return
+		return nil
 	} else if err != nil {
 		atomic.AddInt64(&h.stats.PointsWrittenFail, int64(len(points)))
 		h.httpError(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil
 	} else if parseError != nil {
 		// We wrote some of the points
 		atomic.AddInt64(&h.stats.PointsWrittenOK, int64(len(points)))
 		// The other points failed to parse which means the client sent invalid line protocol.  We return a 400
 		// response code as well as the lines that failed to parse.
 		h.httpError(w, tsdb.PartialWriteError{Reason: parseError.Error()}.Error(), http.StatusBadRequest)
-		return
+		return nil
 	}
 
 	atomic.AddInt64(&h.stats.PointsWrittenOK, int64(len(points)))
 	h.writeHeader(w, http.StatusNoContent)
+	return nil
 }
 
 // serveOptions returns an empty response to comply with OPTIONS pre-flight requests
@@ -1596,14 +1595,13 @@ func (h *Handler) recovery(inner http.Handler, name string) http.Handler {
 // 再向从库中写入
 func (h *Handler) writeAndLog(w http.ResponseWriter, r *http.Request, user meta.User) {
 	// 向主库写入
-	h.serveWrite(w, r, user)
+	bp := h.serveWrite(w, r, user)
 	// 向从库写入
-	client.NewHTTPClient(client.HTTPConfig{
-		Addr:     nil,
-		Username: nil,
-		Password: nil,
-	})
+	e := slave_sync.WritePoints(bp)
 	// 从库写入发生异常，向日志中写入
+	if e != nil {//TODO 处理写入异常
+		h.CLFLogger.Println(e)
+	}
 }
 
 // 增删操作向从库写入，查询只在主库执行

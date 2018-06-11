@@ -9,7 +9,7 @@
 # The data includes a random ID, os, arch, version, the number of series and other
 # usage data. No data from user databases is ever transmitted.
 # Change this option to true to disable reporting.
-# reporting-disabled = false
+reporting-disabled = true
 
 # Bind address to use for the RPC service for backup and restore.
 # bind-address = "127.0.0.1:8088"
@@ -508,17 +508,18 @@
 ### [slave_sync]
 ###
 ### 主从同步，从机配置，默认关闭
+### enabled为true时，必须配置slave_url，如果从机开启了认证，必须配置slave-username和slave-password
 ###
 
 [slave_sync]
   # 从机URL，默认关闭
-  # enabled = false
+  enabled = false
 
   # 从机URL
-  # slave-url = "0.0.0.0:8086"
+  slave-url = "0.0.0.0:8086"
 
   # 从机写入操作账号
-  # slave-username = "username"
+  slave-username = "username"
 
   # 从机写入账号的密码
-  # slave-password = "p.a.s.s.w.o.r.d"
+  slave-password = "p.a.s.s.w.o.r.d"

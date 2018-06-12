@@ -37,7 +37,6 @@ import (
 	"github.com/influxdata/influxql"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
-	"github.com/influxdata/influxdb/slave_sync"
 	"github.com/influxdata/influxdb/client/v2"
 )
 
@@ -149,7 +148,7 @@ func NewHandler(c Config) *Handler {
 		},
 		Route{
 			"write", // Data-ingest route.
-			"POST", "/write", true, true, h.writeAndLog,
+			"POST", "/write", true, true, h.writeAndSync,
 		},
 		Route{
 			"prometheus-write", // Prometheus remote write
@@ -747,7 +746,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.U
 		atomic.AddInt64(&h.stats.PointsWrittenFail, int64(len(points)))
 		h.httpError(w, err.Error(), http.StatusBadRequest)
 		// 获取值
-		return slave_sync.ToBatchPoints(database, r.URL.Query().Get("rp"), string(consistency), r.URL.Query().Get("precision"), points)
+		return toBatchPoints(database, r.URL.Query().Get("rp"), string(consistency), r.URL.Query().Get("precision"), points)
 	} else if influxdb.IsAuthorizationError(err) {
 		atomic.AddInt64(&h.stats.PointsWrittenFail, int64(len(points)))
 		h.httpError(w, err.Error(), http.StatusForbidden)
@@ -1593,14 +1592,14 @@ func (h *Handler) recovery(inner http.Handler, name string) http.Handler {
 
 // 向主库中写入，调用原生h.serveWrite方法
 // 再向从库中写入
-func (h *Handler) writeAndLog(w http.ResponseWriter, r *http.Request, user meta.User) {
+func (h *Handler) writeAndSync(w http.ResponseWriter, r *http.Request, user meta.User) {
 	// 向主库写入
 	bp := h.serveWrite(w, r, user)
 	// 向从库写入
-	e := slave_sync.WritePoints(bp)
+	e := h.writePoints(bp)
 	// 从库写入发生异常，向日志中写入
 	if e != nil {//TODO 处理写入异常
-		h.CLFLogger.Println(e)
+		fmt.Println("写入发生异常")
 	}
 }
 
@@ -1608,9 +1607,41 @@ func (h *Handler) writeAndLog(w http.ResponseWriter, r *http.Request, user meta.
 func (h *Handler) queryAndLog(w http.ResponseWriter, r *http.Request, user meta.User) {
 	// 主库执行方法
 	h.serveQuery(w, r, user)
+	//TODO 新增删除操作是否同步，待研究
 	// 增删操作向从库写入
+	// 判断操作类型
 
 	// 从库写入发生异常，向日志中写入
+
+}
+
+func (h *Handler) writePoints(bp client.BatchPoints) error {
+	if !h.Config.SyncEnabled {
+		return nil
+	}
+	if cli, e := client.NewHTTPClient(client.HTTPConfig{
+		Addr:h.Config.SlaveUrl,
+		Username:h.Config.SlaveUsername,
+		Password:h.Config.SlavePassword,
+	});e == nil {
+		return cli.Write(bp)
+	} else {
+		return e
+	}
+}
+
+// 将参数转换为client.Write(bp BatchPoints)的参数格式
+func toBatchPoints(database string, retentionPolicy string, consistency string, precision string, points models.Points) client.BatchPoints {
+	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+		Precision:        precision,
+		Database:         database,
+		RetentionPolicy:  retentionPolicy,
+		WriteConsistency: consistency,
+	})
+	for _, point := range points {
+		bp.AddPoint(client.NewPointFrom(point))
+	}
+	return bp
 }
 
 // Response represents a list of statement results.

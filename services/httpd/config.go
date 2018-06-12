@@ -40,6 +40,10 @@ type Config struct {
 	BindSocket            string        `toml:"bind-socket"`
 	MaxBodySize           int           `toml:"max-body-size"`
 	AccessLogPath         string        `toml:"access-log-path"`
+	SyncEnabled	          bool          `toml:"sync-enabled"`
+	SlaveUrl         	  string        `toml:"slave-url"`
+	SlaveUsername         string        `toml:"slave-username"`
+	SlavePassword         string        `toml:"slave-password"`
 }
 
 // NewConfig returns a new Config with default settings.
@@ -57,6 +61,7 @@ func NewConfig() Config {
 		UnixSocketPermissions: 0777,
 		BindSocket:            DefaultBindSocket,
 		MaxBodySize:           DefaultMaxBodySize,
+		SyncEnabled:     	   false,
 	}
 }
 
@@ -65,6 +70,7 @@ func (c Config) Diagnostics() (*diagnostics.Diagnostics, error) {
 	if !c.Enabled {
 		return diagnostics.RowFromMap(map[string]interface{}{
 			"enabled": false,
+			"sync-enabled":false,
 		}), nil
 	}
 
@@ -75,5 +81,6 @@ func (c Config) Diagnostics() (*diagnostics.Diagnostics, error) {
 		"max-row-limit":        c.MaxRowLimit,
 		"max-connection-limit": c.MaxConnectionLimit,
 		"access-log-path":      c.AccessLogPath,
+		"sync-enabled":         false,
 	}), nil
 }

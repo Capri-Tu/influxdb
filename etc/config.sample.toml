@@ -269,6 +269,19 @@ reporting-disabled = true
   # The maximum size of a client request body, in bytes. Setting this value to 0 disables the limit.
   # max-body-size = 25000000
 
+  # 主从同步，从机配置，默认关闭
+  # enabled为true时，必须配置slave_url，如果从机开启了认证，必须配置slave-username和slave-password
+  # 默认关闭
+  sync-enabled = false
+
+  # 从机URL
+  slave-url = "0.0.0.0:8086"
+
+  # 从机写入操作账号
+  slave-username = "username"
+
+  # 从机写入账号的密码
+  slave-password = "p.a.s.s.w.o.r.d"
 
 ###
 ### [ifql]
@@ -503,23 +516,3 @@ reporting-disabled = true
 
   # interval for how often continuous queries will be checked if they need to run
   # run-interval = "1s"
-
-###
-### [slave_sync]
-###
-### 主从同步，从机配置，默认关闭
-### enabled为true时，必须配置slave_url，如果从机开启了认证，必须配置slave-username和slave-password
-###
-
-[slave_sync]
-  # 从机URL，默认关闭
-  enabled = false
-
-  # 从机URL
-  slave-url = "0.0.0.0:8086"
-
-  # 从机写入操作账号
-  slave-username = "username"
-
-  # 从机写入账号的密码
-  slave-password = "p.a.s.s.w.o.r.d"

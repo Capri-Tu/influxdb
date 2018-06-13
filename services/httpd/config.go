@@ -44,6 +44,7 @@ type Config struct {
 	SlaveUrl         	  string        `toml:"slave-url"`
 	SlaveUsername         string        `toml:"slave-username"`
 	SlavePassword         string        `toml:"slave-password"`
+	SyncErrorLog          string        `toml:"sync-error-log"`
 }
 
 // NewConfig returns a new Config with default settings.

@@ -745,8 +745,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.U
 	if err := h.PointsWriter.WritePoints(database, r.URL.Query().Get("rp"), consistency, user, points); influxdb.IsClientError(err) {
 		atomic.AddInt64(&h.stats.PointsWrittenFail, int64(len(points)))
 		h.httpError(w, err.Error(), http.StatusBadRequest)
-		// 获取值
-		return toBatchPoints(database, r.URL.Query().Get("rp"), string(consistency), r.URL.Query().Get("precision"), points)
+		return nil
 	} else if influxdb.IsAuthorizationError(err) {
 		atomic.AddInt64(&h.stats.PointsWrittenFail, int64(len(points)))
 		h.httpError(w, err.Error(), http.StatusForbidden)
@@ -771,7 +770,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user meta.U
 
 	atomic.AddInt64(&h.stats.PointsWrittenOK, int64(len(points)))
 	h.writeHeader(w, http.StatusNoContent)
-	return nil
+	return h.toBatchPoints(database, r.URL.Query().Get("rp"), string(consistency), r.URL.Query().Get("precision"), points)
 }
 
 // serveOptions returns an empty response to comply with OPTIONS pre-flight requests
@@ -1595,11 +1594,14 @@ func (h *Handler) recovery(inner http.Handler, name string) http.Handler {
 func (h *Handler) writeAndSync(w http.ResponseWriter, r *http.Request, user meta.User) {
 	// 向主库写入
 	bp := h.serveWrite(w, r, user)
+	if bp == nil {
+		return
+	}
 	// 向从库写入
 	e := h.writePoints(bp)
 	// 从库写入发生异常，向日志中写入
 	if e != nil {//TODO 处理写入异常
-		fmt.Println("写入发生异常")
+		fmt.Println("写入发生异常：", e)
 	}
 }
 
@@ -1623,21 +1625,30 @@ func (h *Handler) writePoints(bp client.BatchPoints) error {
 		Addr:h.Config.SlaveUrl,
 		Username:h.Config.SlaveUsername,
 		Password:h.Config.SlavePassword,
-	});e == nil {
-		return cli.Write(bp)
-	} else {
+	});e != nil {
 		return e
+	} else {
+		if cli == nil {
+			return errors.New("cli为空")
+		}
+		return cli.Write(bp)
 	}
 }
 
 // 将参数转换为client.Write(bp BatchPoints)的参数格式
-func toBatchPoints(database string, retentionPolicy string, consistency string, precision string, points models.Points) client.BatchPoints {
-	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
-		Precision:        precision,
-		Database:         database,
-		RetentionPolicy:  retentionPolicy,
-		WriteConsistency: consistency,
-	})
+func (h *Handler) toBatchPoints(database string, retentionPolicy string, consistency string, precision string, points models.Points) client.BatchPoints {
+	batchPointsConfig := client.BatchPointsConfig{}
+	if database != "" {
+		batchPointsConfig.Database = database
+	}
+	if retentionPolicy != "" {
+		batchPointsConfig.RetentionPolicy = retentionPolicy
+	}
+	batchPointsConfig.WriteConsistency = "one"
+	if precision != "" {
+		batchPointsConfig.Precision = precision
+	}
+	bp, _ := client.NewBatchPoints(batchPointsConfig)
 	for _, point := range points {
 		bp.AddPoint(client.NewPointFrom(point))
 	}

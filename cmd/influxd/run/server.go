@@ -27,6 +27,7 @@ import (
 	"github.com/influxdata/influxdb/services/retention"
 	"github.com/influxdata/influxdb/services/snapshotter"
 	"github.com/influxdata/influxdb/services/subscriber"
+	"github.com/influxdata/influxdb/services/sync"
 	"github.com/influxdata/influxdb/services/udp"
 	"github.com/influxdata/influxdb/tcp"
 	"github.com/influxdata/influxdb/tsdb"
@@ -348,6 +349,14 @@ func (s *Server) appendContinuousQueryService(c continuous_querier.Config) {
 	s.Services = append(s.Services, srv)
 }
 
+func (s *Server) appendSyncService(c httpd.Config)  {
+	if !c.SyncEnabled {
+		return
+	}
+	srv := sync.NewSerivce(c.SyncErrorLog)
+	s.Services = append(s.Services, srv)
+}
+
 // Err returns an error channel that multiplexes all out of band errors received from all services.
 func (s *Server) Err() <-chan error { return s.err }
 
@@ -371,6 +380,7 @@ func (s *Server) Open() error {
 	s.appendMonitorService()
 	s.appendPrecreatorService(s.config.Precreator)
 	s.appendSnapshotterService()
+	s.appendSyncService(s.config.HTTPD)
 	s.appendContinuousQueryService(s.config.ContinuousQuery)
 	s.appendHTTPDService(s.config.HTTPD)
 	s.appendStorageService(s.config.Storage)

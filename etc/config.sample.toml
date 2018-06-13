@@ -275,13 +275,16 @@ reporting-disabled = true
   sync-enabled = false
 
   # 从机URL
-  slave-url = "0.0.0.0:8086"
+  slave-url = "http://0.0.0.0:8086"
 
   # 从机写入操作账号
   slave-username = "username"
 
   # 从机写入账号的密码
   slave-password = "p.a.s.s.w.o.r.d"
+
+  # 同步错误日志
+  sync-error-log = "/var/influxdb/sync.log"
 
 ###
 ### [ifql]
